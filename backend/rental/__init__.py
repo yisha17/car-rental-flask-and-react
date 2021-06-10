@@ -29,6 +29,8 @@ admin.init_app(app)
 API = Api(app)
 
 admin.add_view(ModelView(Cars,db.session))
+admin.add_view(ModelView(Customer,db.session))
+admin.add_view(ModelView(Reservation,db.session))
 
 @app.cli.command('init-db')
 def init_db_command():

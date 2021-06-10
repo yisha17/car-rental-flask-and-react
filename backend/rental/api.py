@@ -1,3 +1,4 @@
+from logging import error
 from re import T
 from flask import Blueprint,request
 from flask.json import jsonify
@@ -6,6 +7,7 @@ from flask_restx import Resource,Api,fields
 from . import db,API
 from .ma import *
 from .models import Cars,Customer,Reservation
+from sqlalchemy.orm import sessionmaker 
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
@@ -24,6 +26,9 @@ customers_schema = CustomerSchema(many=True)
 rv_schema = ReservationSchema()
 rvs_schema = ReservationSchema(many=True)
 
+
+
+
 car = API.model("Cars",{
     'CarName': fields.String,
     'CarType': fields.String,
@@ -35,6 +40,12 @@ customer = API.model("Customer",{
     'CustomerID':fields.Integer,
     'CustomerName':fields.String,
     'CustomerEmail':fields.String,
+    'CustomerPassword':fields.String
+})
+
+user = API.model("Customer",{
+    'CustomerID':fields.Integer,
+    'CustomerName':fields.String,
     'CustomerPassword':fields.String
 })
 
@@ -192,16 +203,28 @@ class CustomersResource(Resource):
     def get(self):
         user = Customer.query.all()
         return rvs_schema.dump(user)
-    
+    @API.expect(customer)
     def post(self):
         user = Customer()
-        user.CustomerName= request.get_json['CustomerName']
-        user.CustomerPassword = request.get_json['CustomerPassword']
+        user.CustomerName = request.json['CustomerName']
+        user.CustomerPassword = request.json['CustomerPassword']
+        if user.CustomerName != "test" or user.CustomerPassword != "test":
+            return jsonify({"msg": "Bad username or password"}), 401
         
+        return customer_schema.dump(customer_schema)
+    
+    @API.expect(user)
+    def post(self):
+        user = Customer()
+        user.CustomerName = request.json['CustomerName']
+        user.CustomerPassword = request.json['CustomerPassword']
         
+        user_check = Customer.query.filter_by(CustomerName = user.CustomerName).filter_by(CustomerPassword = user.CustomerPassword).first()
+        print(user_check.CustomerID)
+        if user_check is None:
+            return None,401
+        else:
+            access_token = create_access_token(identity = user.CustomerName)
+            return jsonify(CustomerID = user_check.CustomerID, access_token = access_token)
         
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        return customer_schema.dump(user)
+
