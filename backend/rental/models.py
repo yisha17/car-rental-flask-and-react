@@ -5,12 +5,13 @@ import sys
 db = SQLAlchemy()
 
 
-class Cars(db.Model):
-    __tablename__ = "cars"
+class Car(db.Model):
+    __tablename__ = "car"
     CarID = db.Column(db.Integer, primary_key=True)
     CarName = db.Column(db.String, nullable=False)
     CarType = db.Column(db.String, nullable=False)
     CarImage = db.Column(db.String, nullable=False)
+    price = db.Column(db.Integer, nullable=False                                                                 )
     isAvailable = db.Column(db.Boolean, nullable=False)
 
 
@@ -25,11 +26,11 @@ class Customer(db.Model):
 class Reservation(db.Model):
     __tablename__ = "reservation"
     ReservationID = db.Column(db.Integer, primary_key=True)
-    CarID = db.Column(db.Integer, db.ForeignKey("cars.CarID"), nullable=False)
+    CarID = db.Column(db.Integer, db.ForeignKey("car.CarID"), nullable=False)
     CustomerID = db.Column(
         db.Integer, db.ForeignKey("customer.CustomerID"), nullable=False
     )
-    pickup_date = db.Column(db.DateTime, nullable=False)
-    dropup_date = db.Column(db.DateTime, nullable=False)
+    pickup_date = db.Column(db.Date, nullable=False)
+    dropup_date = db.Column(db.Date, nullable=False)
     Location = db.Column(db.String,nullable = False)
-    price = db.Column(db.Integer, nullable=False)
+    

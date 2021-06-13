@@ -4,6 +4,9 @@ from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
 from flask_admin import Admin
+from flask_cors import CORS
 
 admin = Admin()
 jwt = JWTManager()
+cors = CORS()
+

@@ -6,12 +6,14 @@ from marshmallow.fields import String
 from flask_restx import Resource,Api,fields
 from . import db,API
 from .ma import *
-from .models import Cars,Customer,Reservation
+from .models import Car,Customer,Reservation
 from sqlalchemy.orm import sessionmaker 
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
+from flask_cors import cross_origin
+
 
 
 
@@ -29,7 +31,7 @@ rvs_schema = ReservationSchema(many=True)
 
 
 
-car = API.model("Cars",{
+car = API.model("Car",{
     'CarName': fields.String,
     'CarType': fields.String,
     'CarImage': fields.String,
@@ -61,7 +63,7 @@ reservation = API.model("Reservation",{
 @API.route("/api/cars/<int:id>")
 class CarResource(Resource):
     def get(self,id):
-        car = Cars.query.filter_by(CarID = id).first()
+        car = Car.query.filter_by(CarID = id).first()
         if car is None:
             return None,404
         return car_schema.dump(car)
@@ -70,7 +72,7 @@ class CarResource(Resource):
     @API.expect(car)
     @API.response(204,'Car Successfully updated')
     def put(self,id):
-        car = Cars.query.filter_by(CarID = id).first()
+        car = Car.query.filter_by(CarID = id).first()
         
         car.CarName = request.json['CarName']
         car.CarType = request.json['CarType']
@@ -86,7 +88,7 @@ class CarResource(Resource):
     
     @API.response(204, 'Car successfully deleted.')
     def delete(self, id):    
-        car = Cars.query.filter_by(CarID = id).first()
+        car = Car.query.filter_by(CarID = id).first()
         if car is None:
             return None,204
         db.session.delete(car)
@@ -96,21 +98,10 @@ class CarResource(Resource):
 @API.route("/api/cars")
 class CarsResource(Resource):
     def get(self):
-        car = Cars.query.all()
+        car = Car.query.all()
         return cars_schema.dump(car)
     
-    @API.expect(car)
-    def post(self):
-        new_car = Cars();
-        new_car.CarName = request.json['CarName']
-        new_car.CarType = request.json['CarType']
-        new_car.CarImage = request.json['CarImage']
-        new_car.isAvailable = True
-        
-        db.session.add(new_car)
-        db.session.commit()
-        
-        return car_schema.dump(new_car)
+    
 
 @API.route('/api/reservation/<int:id>')    
 class ReservationResource(Resource):
@@ -214,15 +205,17 @@ class CustomersResource(Resource):
         return customer_schema.dump(customer_schema)
     
     @API.expect(user)
+    @cross_origin()
     def post(self):
         user = Customer()
         user.CustomerName = request.json['CustomerName']
+        print(user.CustomerName)
         user.CustomerPassword = request.json['CustomerPassword']
         
         user_check = Customer.query.filter_by(CustomerName = user.CustomerName).filter_by(CustomerPassword = user.CustomerPassword).first()
-        print(user_check.CustomerID)
-        if user_check is None:
-            return None,401
+        print(user_check == None)
+        if user_check == None:
+            return jsonify({"msg":"it is not successful"})
         else:
             access_token = create_access_token(identity = user.CustomerName)
             return jsonify(CustomerID = user_check.CustomerID, access_token = access_token)

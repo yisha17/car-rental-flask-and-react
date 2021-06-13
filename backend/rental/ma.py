@@ -7,9 +7,8 @@ ma = Marshmallow(app)
 
 class CarsSchema(ma.Schema):
     class Meta:
-        fields = ("CarID","CarName","CarType","CarImage","isAvailable")
-        
-        model = Cars
+        fields = ("CarID","CarName","CarType","CarImage","CarPrice","isAvailable")
+        model = Car
 
 class CustomerSchema(ma.Schema):
     class Meta:
