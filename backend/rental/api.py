@@ -4,7 +4,7 @@ from flask import Blueprint,request
 from flask.json import jsonify
 from marshmallow.fields import String
 from flask_restx import Resource,Api,fields
-from . import db,API
+from . import db,API,mail
 from .ma import *
 from .models import Car,Customer,Reservation
 from sqlalchemy.orm import sessionmaker 
@@ -13,6 +13,7 @@ from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
 from flask_cors import cross_origin
+from flask_mail import Mail, Message
 
 
 
@@ -35,6 +36,7 @@ car = API.model("Car",{
     'CarName': fields.String,
     'CarType': fields.String,
     'CarImage': fields.String,
+     'price': fields.Integer,
     'isAvailable':fields.Boolean
 })
 
@@ -42,7 +44,8 @@ customer = API.model("Customer",{
     'CustomerID':fields.Integer,
     'CustomerName':fields.String,
     'CustomerEmail':fields.String,
-    'CustomerPassword':fields.String
+    'CustomerPassword':fields.String,
+    'reservations':fields.Nested(rvs_schema)
 })
 
 user = API.model("Customer",{
@@ -52,12 +55,13 @@ user = API.model("Customer",{
 })
 
 reservation = API.model("Reservation",{
+    'ReservationID': fields.Integer,
     'CarID':fields.Integer,
     'CustomerID':fields.Integer,
-    'pickup_date':fields.DateTime,
-    'dropup_date':fields.DateTime,
+    'pickup_date':fields.String,
+    'dropup_date':fields.String,
     'Location':fields.String,
-    'price':fields.Integer
+    'msg':'successful'
 })
 
 @API.route("/api/cars/<int:id>")
@@ -107,10 +111,26 @@ class CarsResource(Resource):
 class ReservationResource(Resource):
     
     def get(self,id):
+        
+        
         rv = Reservation.query.filter_by(ReservationID = id).first()
+        rv.CarID
+        car = Car.query.filter_by(CarID = rv.CarID).first()
+        user = Customer.query.filter_by(CustomerID = rv.CustomerID).first()
+        username = user.CustomerName
+        car_name = car.CarName
+        car_price = car.price
+        car_img = car.CarImage
+        pick = rv.pickup_date
+        drop = rv.dropup_date
+        total = int(pick[-2:]) - int(drop[-2:]) * car_price
+        
+        
+        
+        
         if rv is None:
             return None,404
-        return rv_schema.dump(rv)
+        return jsonify(username= username,car_name=car_name,car_img=car_img,pick = pick,drop=drop,total=total)
     
     @API.expect(reservation)
     @API.response(204,'Car Successfully updated')
@@ -122,7 +142,7 @@ class ReservationResource(Resource):
         rv.pickup_date = request.json['pickup_date']
         rv.dropup_date = request.json['dropup_date']
         rv.Location = request.json['Location']
-        rv.price = request.json['price']
+        
          
         
         db.session.add(rv)
@@ -147,24 +167,46 @@ class ReservationsResource(Resource):
     
     def post(self):
         rv = Reservation()
+        car = Car()
+        user = Customer()
         rv.CarID = request.json['CarID']
         rv.CustomerID = request.json['CustomerID']
         rv.pickup_date = request.json['pickup_date']
         rv.dropup_date = request.json['dropup_date']
         rv.Location = request.json['Location']
-        rv.price = request.json['price']
+        
+        
+        if (rv.CarID == '' or rv.CustomerID == '' or rv.Location == '' ):
+            return jsonify({'msg':'it is not successful'})
+        else:
+            db.session.add(rv)
+            db.session.commit()
+            
+            car = Car.query.filter_by(CarID = rv.CarID).first()
+            car.isAvailable = False
+            db.session.commit()
+            
+            name = Customer.query.filter_by(CustomerID = rv.CustomerID).first()
+            first = name.CustomerName
+            email = name.CustomerEmail
+            pdate = rv.pickup_date
+            ddate = rv.dropup_date
+            
+            msg = Message('hello {}'.format(name.CustomerName),sender='it.yisak.wondim@gmail.com',recipients =['it.yisak.wondim@gmail.com'])
+            msg.body = f'Hi {first} you successfully reserve a car. you have to pick your car on {pdate} and return the car on {ddate}. Thanks'
+            mail.send(msg)
+        
+            return rv_schema.dump(rv)
+        
          
         
-        db.session.add(rv)
-        db.session.commit()
         
-        return rv_schema.dump(rv)
 
 @API.route('/api/customer/<int:id>')    
 class CustomerResource(Resource):
     
     def get(self,id):
-        user = Customer.query.filter_by(ReservationID = id).first()
+        user = Customer.query.filter_by(CustomerID = id).first()
         return customer_schema.dump(user)
     
     @API.expect(customer)
@@ -194,30 +236,41 @@ class CustomersResource(Resource):
     def get(self):
         user = Customer.query.all()
         return rvs_schema.dump(user)
-    @API.expect(customer)
-    def post(self):
-        user = Customer()
-        user.CustomerName = request.json['CustomerName']
-        user.CustomerPassword = request.json['CustomerPassword']
-        if user.CustomerName != "test" or user.CustomerPassword != "test":
-            return jsonify({"msg": "Bad username or password"}), 401
-        
-        return customer_schema.dump(customer_schema)
+    
+    
     
     @API.expect(user)
     @cross_origin()
     def post(self):
         user = Customer()
         user.CustomerName = request.json['CustomerName']
-        print(user.CustomerName)
         user.CustomerPassword = request.json['CustomerPassword']
-        
+        msg = 'successful'
         user_check = Customer.query.filter_by(CustomerName = user.CustomerName).filter_by(CustomerPassword = user.CustomerPassword).first()
-        print(user_check == None)
         if user_check == None:
             return jsonify({"msg":"it is not successful"})
         else:
             access_token = create_access_token(identity = user.CustomerName)
-            return jsonify(CustomerID = user_check.CustomerID, access_token = access_token)
+            return jsonify(CustomerID = user_check.CustomerID, access_token = access_token,msg=msg)
+
+@API.route('/api/register/customer')        
+class UserResource(Resource): 
+    def post(self):
+        try:
+            user = Customer()
+            user.CustomerName= request.json['CustomerName']
+            user.CustomerEmail = request.json['CustomerEmail']
+            user.CustomerPassword = request.json['CustomerPassword']
+            
+            db.session.add(user)
+            db.session.commit()
+            
+            return rv_schema.dump(user)
+        except:
+            return jsonify({"msg":"not successful"},404)
+
+        
+        
+               
         
 
